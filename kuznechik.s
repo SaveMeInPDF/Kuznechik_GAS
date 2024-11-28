@@ -1,4 +1,4 @@
-rootc.s:
+kuznechik.s:
         .global main
         .text
 main:

@@ -1,165 +1,167 @@
-kuznechik.s:
-        .global main
-        .text
+code.s:
+  .global main
+  .text
 main:
 
-        # Полезно посмотреть
-        # tis-100; shenzen IO; comet64
+  # Полезно посмотреть
+  # tis-100; shenzen IO; comet64
 
 
-        # 9 полных раундов, состоящих из 3х операций:
-        # операчия наложения итерационного ключа K.(j)
-        # нелинейное преобразование (S)
-        # линейное преобразование (L)
-        # call = sub $8, %rsp; mov %rip, (%rsp); jmp function; (...)
-        # function: mov %rsp, %rbp; sub $(к-во сдвигов стека), %rsp; (...); mov %rbp, %rsp; ret.
+  # 9 полных раундов, состоящих из 3х операций:
+  # операчия наложения итерационного ключа K.(j)
+  # нелинейное преобразование (S)
+  # линейное преобразование (L)
+  # call = sub $8, %rsp; mov %rip, (%rsp); jmp function; (...)
+  # function: mov %rsp, %rbp; sub $(к-во сдвигов стека), %rsp; (...); mov %rbp, %rsp; ret.
 
 
-        # ПЕРЕДАЧА ДАННЫХ В НЕКОТОРЫЕ Ф-ЦИИ (sub_fun):
-        # parent_fun: subq $16, %rsp;
-        #
-
-
-        # после идёт 10й раунд - побитовый XOR ключа и входного блока данных
-
-        # TEST
-        mov $open_txt, %rdi
-        call lin_t_f
-
-        subq $16, %rsp  # Сдвинуть стек на 16 для дальнейшего использования (переменные)
-        # mov %rax, (%rsp)# Поместить вывод ф-ции в ЗНАЧЕНИЕ стека (rsp[0] = rax)
-        mov %rax, %rsi  # Теперь помещаем указатель на rax в rsi (регистр вывода)
-
-        # TSET
-
-        mov     $1, %rax                # system call 1 is write
-        mov     $1, %rdi                # file handle 1 is stdout
-        # mov     $rbx, %rsi            # address of string to output
-        mov     $16, %rdx               # number of bytes
-        syscall                         # invoke operating system to do the write
-
-        # exit(0)
-
+  # ПЕРЕДАЧА ДАННЫХ В НЕКОТОРЫЕ Ф-ЦИИ (sub_fun):
+  # parent_fun: subq $16, %rsp;
   #
-        # mov     $60, %rax               # system call 60 is exit
-        # xor     %rdi, %rdi              # we want return code 0
-        # syscall
-        xor %rax, %rax
-        addq $16, %rsp
-        ret
+
+
+  # после идёт 10й раунд - побитовый XOR ключа и входного блока данных
+
+  # TEST
+  subq $16, %rsp
+  movb $1, 15(%rsp)
+  movq 15(%rsp), %rdi
+  call lin_t_f
+
+  subq $16, %rsp  # Сдвинуть стек на 16 для дальнейшего использования (переменные)
+  # mov %rax, (%rsp)# Поместить вывод ф-ции в ЗНАЧЕНИЕ стека (rsp[0] = rax)
+  mov %rax, %rsi  # Теперь помещаем указатель на rax в rsi (регистр вывода)
+
+  # TSET
+
+  mov     $1, %rax                # system call 1 is write
+  mov     $1, %rdi                # file handle 1 is stdout
+  # mov     $rbx, %rsi            # address of string to output
+  mov     $16, %rdx               # number of bytes
+  syscall                         # invoke operating system to do the write
+
+  # exit(0)
+
+#
+  # mov     $60, %rax               # system call 60 is exit
+  # xor     %rdi, %rdi              # we want return code 0
+  # syscall
+  xor %rax, %rax
+  addq $16, %rsp
+  ret
 
 # Substitution function
 sub_fun:
-        # Cycle
-        movq $16, %rcx # counter
-        mov %rdi, %rax
-        subq $8, %rsp
-        sub_fun_loop:
-                movb (%rax), %bl
-                lea dir_subs(,%ebx, 1), %rdx
-                mov (%rdx), %rdx
-                movb %dl, (%rax)
-                add $1, %rax
-                loopq sub_fun_loop
-        add $8, %rsp
-        mov %rdi, %rax
-        ret
+  # Cycle
+  movq $16, %rcx # counter
+  mov %rdi, %rax
+  subq $8, %rsp
+  sub_fun_loop:
+    movb (%rax), %bl
+    lea dir_subs(,%ebx, 1), %rdx
+    mov (%rdx), %rdx
+    movb %dl, (%rax)
+    add $1, %rax
+    loopq sub_fun_loop
+  add $8, %rsp
+  mov %rdi, %rax
+  ret
 
 
 
 
 # Reversed substituion
 rev_sub:
-        movq $16, %rcx # counter
-        mov %rdi, %rax
-        subq $8, %rsp
-        rev_sub_loop:
-                movb (%rax), %bl
-                lea rev_subs(,%ebx,1), %rdx
-                mov (%rdx), %rdx
-                movb %dl, (%rax)
-                add $1, %rax
-                loopq rev_sub_loop
-        add $8, %rsp
-        mov %rdi, %rax
-        ret
+  movq $16, %rcx # counter
+  mov %rdi, %rax
+  subq $8, %rsp
+  rev_sub_loop:
+    movb (%rax), %bl
+    lea rev_subs(,%ebx,1), %rdx
+    mov (%rdx), %rdx
+    movb %dl, (%rax)
+    add $1, %rax
+    loopq rev_sub_loop
+  add $8, %rsp
+  mov %rdi, %rax
+  ret
 
 # Galua field multiplication
 GF_mult:
-        xor %rax, %rax  # Локальная переменная C
-        GF_mult_while:  # Цикл while(b)
-        test %rsi, %rsi # Проверка, что b != 0
-        jz GF_exit
-        test $1, %rsi   # Проверка b & 1 != 0
-        jz GF_skip_xor
-        xor %rdi, %rax
-        GF_skip_xor:
-                mov %rdi, %rcx
-                and $0x80, %rcx
-                shl $1, %rdi
+  xor %rax, %rax  # Локальная переменная C
+  GF_mult_while:  # Цикл while(b)
+  test %rsi, %rsi # Проверка, что b != 0
+  jz GF_exit
+  test $1, %rsi   # Проверка b & 1 != 0
+  jz GF_skip_xor
+  xor %rdi, %rax
+  GF_skip_xor:
+    mov %rdi, %rcx
+    and $0x80, %rcx
+    shl $1, %rdi
     and $255, %rdi
-                cmp $0, %rcx
-                jz GF_skip_red
-                xor $0xC3, %rdi
-                GF_skip_red:
-                    shr $1, %rsi
-                    and $255, %rsi
-                    jmp GF_mult_while
-                GF_exit:
-                  ret
+    cmp $0, %rcx
+    jz GF_skip_red
+    xor $0xC3, %rdi
+    GF_skip_red:
+      shr $1, %rsi
+      and $255, %rsi
+      jmp GF_mult_while
+    GF_exit:
+      ret
 
 
 # R subfunction of Linear transformation
 R_subfn:
-        mov $15, %rcx           # Счётчик
-        subq $32, %rsp          # Освобождаем место под наши нужды в стеке
-        mov 15(%rdi), %rax      # ACC
-        mov %rax, 24(%rsp)
-        mov %rdi, %rax          # Помещаем указатель на rdi в rax
-        R_subfn_loop:
-                mov %rcx, %r8
-                mov %rcx, %r9
-                dec %r8
-                movb (%rax, %r8), %r8b # Теперь в r8 лежит byte[i]
-                movb %r8b, (%rax, %r9) # byte[i+1] (%rax) = byte[i]
+  mov $15, %rcx           # Счётчик
+  subq $32, %rsp          # Освобождаем место под наши нужды в стеке
+  mov 15(%rdi), %rax      # ACC
+  mov %rax, 24(%rsp)
+  mov %rdi, %rax          # Помещаем указатель на rdi в rax
+  R_subfn_loop:
+    mov %rcx, %r8
+    mov %rcx, %r9
+    dec %r8
+    movb (%rax, %r8), %r8b # Теперь в r8 лежит byte[i]
+    movb %r8b, (%rax, %r9) # byte[i+1] (%rax) = byte[i]
 
-                xor %rdi, %rdi
-                xor %rsi, %rsi
-                xor %r9, %r9
+    xor %rdi, %rdi
+    xor %rsi, %rsi
+    xor %r9, %r9
 
-                mov %r8, %rdi
-                dec %rcx
-                lea line_vec(,%rcx, 1), %rbx
-                inc %rcx
-                movb (%rbx), %r9b
-                mov %r9, %rsi
+    mov %r8, %rdi
+    dec %rcx
+    lea line_vec(,%rcx, 1), %rbx
+    inc %rcx
+    movb (%rbx), %r9b
+    mov %r9, %rsi
 
-                xor %r8, %r8
+    xor %r8, %r8
 
-                # А теперь резервируем всё-всё-всё в стек (убейте меня...)
-                mov %rax, 16(%rsp)
-                mov %rcx, 8(%rsp)
-                mov $return_R_subfn, %rcx
-                mov %rcx, (%rsp)
+    # А теперь резервируем всё-всё-всё в стек (убейте меня...)
+    mov %rax, 16(%rsp)
+    mov %rcx, 8(%rsp)
+    mov $return_R_subfn, %rcx
+    mov %rcx, (%rsp)
 
-                jmp GF_mult
-                return_R_subfn:
+    jmp GF_mult
+    return_R_subfn:
 
-                # А теперь разархивируем
-                mov %rax, %r9
-                mov (%rsp), %rcx
-                mov 16(%rsp), %rax
-                subq $8, %rsp
+    # А теперь разархивируем
+    mov %rax, %r9
+    mov (%rsp), %rcx
+    mov 16(%rsp), %rax
+    subq $8, %rsp
 
-                xor %r9, %rax
-                mov %rax, 24(%rsp)
-                mov 16(%rsp), %rax
+    xor %r9, %rax
+    mov %rax, 24(%rsp)
+    mov 16(%rsp), %rax
 
-                loopq R_subfn_loop
-        mov 24(%rsp), %r8
-        movb %r8b, (%rax)
-        addq $32, %rsp
-        ret
+    loopq R_subfn_loop
+  mov 24(%rsp), %r8
+  movb %r8b, (%rax)
+  addq $32, %rsp
+  ret
 
 
 # Reversed R subfunction
@@ -196,26 +198,26 @@ R_subf_r_loop:
   mov %rcx, (%rsp)
 
   jmp GF_mult
-return_R_subf_r:
+  return_R_subf_r:
+    
+    # Return to our context
+    mov %rax, %r9
+    mov (%rsp), %rcx
+    mov 16(%rsp), %rax
+    subq $8, %rsp
 
-  # Return to our context
-  mov %rax, %r9
-  mov (%rsp), %rcx
-  mov 16(%rsp), %rax
-  subq $8, %rsp
+    xor %r9, %rax
+    mov %rax, 24(%rsp)
+    mov 16(%rsp), %rax
 
-  xor %r9, %rax
-  mov %rax, 24(%rsp)
-  mov 16(%rsp), %rax
+    inc %rcx
+    cmp $15, %rcx
+    jne R_subf_r_loop
 
-  inc %rcx
-  cmp $15, %rcx
-  jne R_subf_r_loop
-
-
-  mov 24(%rsp), %r8
-  #movb %r8b, 15(%rax)
-  addq $32, %rsp
+    
+    mov 24(%rsp), %r8
+    #movb %r8b, 15(%rax)
+    addq $32, %rsp
 ret
 
 
@@ -234,14 +236,14 @@ lin_t_f:
     mov %rcx, (%rsp)
 
     jmp R_subfn
-return_lin_t_f:
-  mov %rax, %rdi
-  mov (%rsp), %rcx
-  subq $8, %rsp
-  loopq lin_t_f_loop
+    return_lin_t_f:
+      mov %rax, %rdi
+      mov (%rsp), %rcx
+      subq $8, %rsp
+      loopq lin_t_f_loop
 
-  mov %rdi, %rax
-  addq $16, %rsp
+      mov %rdi, %rax
+      addq $16, %rsp
 ret
 
 
@@ -256,7 +258,7 @@ lin_t_f_r:
     mov $return_lin_t_f_r, %rcx
     mov %rcx, (%rsp)
 
-    jmp R_subfn_r
+    jmp R_subf_r
 return_lin_t_f_r:
   mov %rax, %rdi
   mov (%rsp), %rcx
@@ -268,6 +270,29 @@ return_lin_t_f_r:
 ret
 
 # Iteration key generating function
+gen_round_keys:
+  # Preserving space on stack for *constants*
+  subq $512, %rsp
+  # Counter = 0
+  xor %rcx, %rcx
+gen_round_keys_loop: # генерация констант через линейное преобразование
+  mov %rcx, %r8
+  mov $32, %r9
+  mulq %r9
+  mov %rax, %rcx
+  addq $15, %r8 # В r8 лежит позиция в двумерном массиве, по сути, [i][15]
+  inc %rcx
+  mov %rcx, (%rsp, %r8)
+  dec %rcx
+
+  mov $sphr_txt, %r9
+  mov (%rsp, %r8), %r8
+  mov %r8, %r9
+
+
+
+  
+
 
 
 # Sypher function
@@ -281,7 +306,7 @@ ret
 
 .data
         # intended variables
-        main_key: .fill 32, 1, 0
+        main_key: .byte 73, 72, 97, 118, 101, 78, 111, 67, 114, 105, 99, 107, 101, 116, 65, 110, 100, 73, 77, 117, 115, 116, 68, 101, 99, 121, 112, 104, 101, 114, 33, 33
         open_txt: .byte 73, 32, 72, 97, 116, 101, 32, 78, 105, 103, 103, 101, 114, 115, 33, 33
         sphr_txt: .fill 16, 1, 0 # sypher text
 
@@ -293,3 +318,4 @@ ret
 
         # Reversed Pi
         rev_subs: .byte 165, 45, 50, 143, 14, 48, 56, 192, 84, 230, 158, 57, 85, 126, 82, 145, 100, 3, 87, 90, 28, 96, 7, 24, 33, 114, 168, 209, 41, 198, 164, 63, 224, 39, 141, 12, 130, 234, 174, 180, 154, 99, 73, 229, 66, 228, 21, 183, 200, 6, 112, 157, 65, 117, 25, 201, 170, 252, 77, 191, 42, 115, 132, 213, 195, 175, 43, 134, 167, 177, 178, 91, 70, 211, 159, 253, 212, 15, 156, 47, 155, 67, 239, 217, 121, 182, 83, 127, 193, 240, 35, 231, 37, 94, 181, 30, 162, 223, 166, 254, 172, 34, 249, 226, 74, 188, 53, 202, 238, 120, 5, 107, 81, 225, 89, 163, 242, 113, 86, 17, 106, 137, 148, 101, 140, 187, 119, 60, 123, 40, 171, 210, 49, 222, 196, 95, 204, 207, 118, 44, 184, 216, 46, 54, 219, 105, 179, 20, 149, 190, 98, 161, 59, 22, 102, 233, 92, 108, 109, 173, 55, 97, 75, 185, 227, 186, 241, 160, 133, 131, 218, 71, 197, 176, 51, 250, 150, 111, 110, 194, 246, 80, 255, 93, 169, 142, 23, 27, 151, 125, 236, 88, 247, 31, 251, 124, 9, 13, 122, 103, 69, 135, 220, 232, 79, 29, 78, 4, 235, 248, 243, 62, 61, 189, 138, 136, 221, 205, 11, 19, 152, 2, 147, 128, 144, 208, 36, 52, 203, 237, 244, 206, 153, 16, 68, 64, 146, 58, 1, 38, 18, 26, 72, 104, 245, 129, 139, 199, 214, 32, 10, 8, 0, 76, 215, 116
+

@@ -307,7 +307,7 @@ gen_round_keys_loop: # генерация констант через линей
 .data
   # intended variables
   main_key: .byte 73, 72, 97, 118, 101, 78, 111, 67, 114, 105, 99, 107, 101, 116, 65, 110, 100, 73, 77, 117, 115, 116, 68, 101, 99, 121, 112, 104, 101, 114, 33, 33
-  open_txt: .byte 'Y', 'a', ' ', 'K', 'o', 's', 'h', 'k', 'o', 'm', 'a', 'l', 'c', 'h', 'i', 'k'
+  open_txt: .byte 'I', ' ', '<', '3', ' ', 'A', 'n', 'i', 'm', 'a', 'l', ' ', 'W', 'e', 'l', 'l'
   sphr_txt: .fill 16, 1, 0 # sypher text
 
   desp_txt: .fill 16, 1, 0 # deciphered text
